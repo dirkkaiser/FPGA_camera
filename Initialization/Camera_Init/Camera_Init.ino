@@ -57,12 +57,24 @@ this does not work because the wire library takes 7 bit addresses and does the l
 #define MIDL 0x1D // manufacturer ID byte low defauts A2
 #define MVFP 0x1E // mirror/vflip enable defaults 01
 #define LAEC 0x1F // Reserved defaults 00
+#define AEW 0x24 // AGC/AEC stable operating region upper limit defaults 75
+#define AEB 0x25 // AGC/AEC stable operating region lower limit defaults 63
+#define VPT 0x26 // fast mode operating region defaults D4
 #define HREF 0x32 // HREF control defaults 80
 #define TSLB 0x3A // Line Buffer Test Option defaults 0D
+#define COM12 0x3C // common control 12 href option defaults 68
 #define COM14 0x3E // common control 14 DCW and PCLK enable/divider/manual scaling defaults 00
+#define GFIX 0x68 // fix gain control defaults 00
 #define SCALING_XSC 0x70 // horizontal scale factor
 #define SCALING_YSC 0x71 // vertical scale factor
+#define HAECC1 0x9F // histogram based AEC/AGC control 1 defaults C0
+#define HAECC2 0xA0 // histogram based AEC/AGC control 2 defaults 90
 #define BD50MAX 0xA5 // 50Hz banding step limit
+#define HAECC3 0xA6 // histogram based AEC/AGC control 3 defaults F0
+#define HAECC4 0xA7 // histogram based AEC/AGC control 4 defaults C1
+#define HAECC5 0xA8 // histogram based AEC/AGC control 5 defaults F0
+#define HAECC6 0xA9 // histogram based AEC/AGC control 6 defaults C1
+#define HAECC7 0xAA // AEC algorithm selection defaults 14
 #define BD60MAX 0xAB // 60Hz banding step limit
 //-------------------------------------------------------------------------------------------------
 
@@ -123,6 +135,7 @@ void setup() {
 
     /* Gamma curve values */
     // setting the gamma correction registers with values that are known to produce an acceptable image most of them are unhelpful and it is quicker just to leave them as hex values, especially because that is how it is label in the arduino library
+    // I realize that writing consecutive bits like this is no optimized, but it allows me to only have one function to do all of it
     writeReg(0x7A, 0x20);
     writeReg(0x7B, 0x10);
     writeReg(0x7C, 0x1E);
@@ -149,7 +162,64 @@ void setup() {
     writeReg(COM9, 0x18); /* 4x gain + magic rsvd bit */
     writeReg(BD50MAX, 0x05);
     writeReg(BD60MAX, 0x07);
+    writeReg(AEW, 0x95);
+    writeReg(AEB, 0x33);
+    writeReg(VPT, 0xE3);
+    writeReg(HAECC1, 0x78);
+    writeReg(HAECC2, 0x68);
+    writeReg(0xA1, 0x03); /* magic reserved bit*/
+    writeReg(HAECC3, 0xD8);
+    writeReg(HAECC4, 0xD8);
+    writeReg(HAECC5, 0xF0);
+    writeReg(HAECC6, 0x90);
+    writeReg(HAECC7, 0x94);
+    writeReg(COM8, 0xE7);
+
+    /* Almost all of these are magic "reserved" values.  */
+    writeReg(COM5, 0x61);
+    writeReg(COM6, 0x4B);
+    writeReg(0x16, 0x02);
+    writeReg(0x1E, 0x07);
+    writeReg(0x21, 0x02);
+    writeReg(0x22, 0x91);
+    writeReg(0x29, 0x07);
+    writeReg(0x33, 0x0B);
+    writeReg(0x35, 0x0B);
+    writeReg(0x37, 0x1D);
+    writeReg(0x38, 0x71);
+    writeReg(0x39, 0x2A);
+    writeReg(COM12, 0x78);
+    writeReg(0x4D, 0x40);
+    writeReg(0x4E, 0x20);
+    writeReg(GFIX, 0x00);
+    writeReg(0x6B, 0x4A);
+    writeReg(0x74, 0x10);
+    writeReg(0x8D, 0x4F);
+    writeReg(0x8E, 0x00);
+    writeReg(0x8F, 0x00);
+    writeReg(0x90, 0x00);
+    writeReg(0x91, 0x00);
+    writeReg(0x96, 0x00);
+    writeReg(0x9A, 0x00);
+    writeReg(0xB0, 0x84);
+    writeReg(0xB1, 0x0C);
+    writeReg(0xB2, 0x0E);
+    writeReg(0xB3, 0x82);
+    writeReg(0xB8, 0x0A);
+
+	  /* Matrix coefficients */
+    writeReg(0x4F, 0x80);
+    writeReg(0x50, 0x80);
+    writeReg(0x51, 0x00);
+    writeReg(0x52, 0x22);
+    writeReg(0x53, 0x5E);
+    writeReg(0x54, 0x54);
+    writeReg(0x58, 0x9E);
   }
+}
+
+void loop() {
+  // turns out loop is still needed to run arduino
 }
 
 //-------------------------------functions---------------------------------------------------------
@@ -157,7 +227,7 @@ int readReg(int x) {
 
   Wire.beginTransmission(ovAddr); // begin i2c transmission
   Wire.write(byte(x)); // point to register
-  Wire.endTransmission;
+  Wire.endTransmission();
   Wire.requestFrom(ovAddr, 1); // regquest 1 byte from camera
 
   do { // do while used to ensure something is returned each time function is called
@@ -170,5 +240,6 @@ void writeReg(int x, int data) {
   Wire.beginTransmission(ovAddr); // begin i2c transmission
   Wire.write(byte(x)); // point to register
   Wire.write(byte(data)); // send data to register
-  Wire.endTransmission;
+  Wire.endTransmission();
 }
+
