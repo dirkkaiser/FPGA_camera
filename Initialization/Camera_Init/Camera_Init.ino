@@ -62,8 +62,14 @@ this does not work because the wire library takes 7 bit addresses and does the l
 #define VPT 0x26 // fast mode operating region defaults D4
 #define HREF 0x32 // HREF control defaults 80
 #define TSLB 0x3A // Line Buffer Test Option defaults 0D
+#define COM11 0x3B // common control 11 defaults 3B bit[7]: night mode, bit[6:5]: minimum frame rate of nightmode, bit[4]: D56_auto, bit[3]: banding filter value select, bit[2]: reserved, bit[1]: exposure timeing can be less than limit, bit[0]: reserved
 #define COM12 0x3C // common control 12 href option defaults 68
+#define COM13 0x3D // common control 13 defaults 88 bit[7]: gamma enable, bit[6]: uv saturation level, bit[5:1]: reserved, bit[0]: uv swap
 #define COM14 0x3E // common control 14 DCW and PCLK enable/divider/manual scaling defaults 00
+#define EDGE 0x3F // edge enhancement adjustment defaults 00
+#define COM15 0x40 // common control 15 defaults C0 bit[7:6]: data format, bit[5:4]: RGB 555/565 option, bit[3:0] reserved
+#define COM16 0x41 // common control 16 defaults 08 bit[7:6]: reserved, bit[5]: enable edge enhancement threshold auto-adjustment for YUV output, bit[4]: denoise threshold auto adjustment, bit[3]: AWB gain enable, bit[2]: reserved, bit[1]: color matrix coefficient double, bit[0]: reserved
+#define COM17 0x42 // common control 17 defaults 00 bit[7:6]: AEC window, bit[5:4]: reserved, bit[3]: DSP color bar enable, bit[2:0]: reserved
 #define GFIX 0x68 // fix gain control defaults 00
 #define SCALING_XSC 0x70 // horizontal scale factor
 #define SCALING_YSC 0x71 // vertical scale factor
@@ -89,6 +95,7 @@ void setup() {
   Serial.println("Starting intitialization....");
 
   Wire.begin(); // join i2c bus (address optional for master)
+  Wire.setClock(100000); // eventhough the ov7670 datasheet says 400kHz, only 100kHz seems to work
 
   int id;
   id = readReg(PID);
@@ -207,6 +214,29 @@ void setup() {
     writeReg(0xB3, 0x82);
     writeReg(0xB8, 0x0A);
 
+    /* More reserved magic, some of which tweaks white balance */
+    writeReg(0x43, 0x0A);
+    writeReg(0x44, 0xF0);
+    writeReg(0x45, 0x34);
+    writeReg(0x46, 0x58);
+    writeReg(0x47, 0x28);
+    writeReg(0x48, 0x3A);
+    writeReg(0x59, 0x88);
+    writeReg(0x5A, 0x88);
+    writeReg(0x5B, 0x44);
+    writeReg(0x5C, 0x67);
+    writeReg(0x5D, 0x44);
+    writeReg(0x5E, 0x0E);
+    writeReg(0x6C, 0x0A);
+    writeReg(0x6D, 0x55);
+    writeReg(0x6E, 0x11);
+    writeReg(0x6F, 0x9F); /* "9e for advance AWB" */
+    writeReg(0x6A, 0x40);
+    writeReg(BLUE, 0x40);
+    writeReg(RED, 0x60);
+    writeReg(COM8, 0xE7);
+
+
 	  /* Matrix coefficients */
     writeReg(0x4F, 0x80);
     writeReg(0x50, 0x80);
@@ -215,6 +245,59 @@ void setup() {
     writeReg(0x53, 0x5E);
     writeReg(0x54, 0x54);
     writeReg(0x58, 0x9E);
+
+    /* de-noise and more reserved registers */
+    writeReg(COM16, 0x08);
+    writeReg(EDGE, 0x00);
+    writeReg(0x75, 0x05);
+    writeReg(0x76, 0xE1);
+    writeReg(0x4C, 0x00);
+    writeReg(0x77, 0x01);
+    writeReg(COM13, 0xC3);
+    writeReg(0x4B, 0x09);
+    writeReg(0xC9, 0x60);
+    writeReg(COM16, 0x38);
+    writeReg(0x56, 0x40); // contrast control
+    writeReg(0x34, 0x11);
+    writeReg(COM11, 0x12);
+    writeReg(0xA4, 0x88);
+    writeReg(0x97, 0x30);
+    writeReg(0x98, 0x20);
+    writeReg(0x99, 0x30);
+    writeReg(0x9A, 0x84);
+    writeReg(0x9B, 0x29);
+    writeReg(0x9C, 0x03);
+    writeReg(0x9D, 0x4C);
+    writeReg(0x9E, 0x3F);
+    writeReg(0x78, 0x04);
+
+    /* Extra-weird stuff.  Some sort of multiplexor register */
+    writeReg(0x79, 0x01);
+    writeReg(0xC8, 0xF0);
+    writeReg(0x79, 0x0F);
+    writeReg(0xC8, 0x00);
+    writeReg(0x79, 0x10);
+    writeReg(0xC8, 0x7E);
+    writeReg(0x79, 0x0A);
+    writeReg(0xC8, 0x80);
+    writeReg(0x79, 0x0B);
+    writeReg(0xC8, 0x01);
+    writeReg(0x79, 0x0C);
+    writeReg(0xC8, 0x0F);
+    writeReg(0x79, 0x0D);
+    writeReg(0xC8, 0x20);
+    writeReg(0x79, 0x09);
+    writeReg(0xC8, 0x80);
+    writeReg(0x79, 0x02);
+    writeReg(0xC8, 0xC0);
+    writeReg(0x79, 0x03);
+    writeReg(0xC8, 0x40);
+    writeReg(0x79, 0x05);
+    writeReg(0xC8, 0x30);
+    writeReg(0x79, 0x26);
+  }
+  else {
+    Serial.println("Camera not found, please reset arduino to try again");
   }
 }
 
@@ -231,7 +314,8 @@ int readReg(int x) {
   Wire.requestFrom(ovAddr, 1); // regquest 1 byte from camera
 
   do { // do while used to ensure something is returned each time function is called
-  return Wire.read();
+  byte y = Wire.read();
+  return y;
   }
   while (Wire.available());
 }
@@ -242,4 +326,3 @@ void writeReg(int x, int data) {
   Wire.write(byte(data)); // send data to register
   Wire.endTransmission();
 }
-
